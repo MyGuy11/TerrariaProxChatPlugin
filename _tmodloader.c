@@ -1,29 +1,29 @@
 // Author.name = MyGuy
 
-#ifndef _WIN32
+// Why does every std function have an underscore in front on windows
+#ifdef _WIN32
+#define _CRT_SECURE_NO_WARNINGS
 
 #include "include/mumble/MumbleAPI_v_1_0_x.h"
 #include "include/mumble/MumblePlugin_v_1_0_x.h"
 #include "include/tmodloader.h"
 
-#include <fcntl.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/mman.h>
 #include <sys/types.h>
+#include <windows.h>
 
 struct MumbleAPI_v_1_0_x mumbleAPI;
 mumble_plugin_id_t ownID;
 
-const char* fileName = "tModLoaderProxChat.tmp";
+const char* fileName = "\\tModLoaderProxChat.tmp";
 char* filePath;
 char* buf;
 char* logPath;
 FILE* logFp;
 
-int fd;
 char* mappedFile;
 char* newContext;
 data_container_t* data;
@@ -31,10 +31,11 @@ data_container_t* data;
 ProxError_t readData(char* mmfPtr) {
     data->inWorld = mmfPtr[11];
 
+    /*
     if (data->inWorld == 0){
         return NoError;
     }
-
+    */
     for (int i = 0; i < 4; i++) {
         buf[i] = (byte)mmfPtr[i];
         #ifdef DEBUG
@@ -162,50 +163,111 @@ void log_data() {
 }
 
 void mmfPeek() {
-    system("clear");
-    for (int i = 13; i < 64; i++) {
+    system("cls");
+    for (int i = 0; i < 64; i++) {
         printf("mappedFile[%d]: %c\n", i, mappedFile[i]);
+        if (i > 59 && i < 63) {
+            printf("mappedFile[%d]: %d\n", i, mappedFile[i]);
+        }
     }
     
 }
 
-ProxError_t unix_main() {
-    strcpy(filePath, getenv("TMPDIR"));
-    strcat(filePath, fileName);
+void* mmap(char* filePath, int mapSize) {
     
+    HANDLE handle = CreateFileA(
+        filePath,
+        GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE,
+        NULL,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        NULL
+    );
 
-    if ((fd = open(filePath, O_RDONLY)) == -1) {
-        perror("open failed");
-        printf("run terraria first!\n"); // Convert to mumble error in the init function
+    if (handle == INVALID_HANDLE_VALUE) {
+        printf("invalid handle\nerr code: %d", GetLastError());
+        return (void*)FileError;
+    }
+
+    HANDLE mappedHandle = CreateFileMapping(
+        handle,
+        NULL,
+        PAGE_READONLY,
+        0,
+        0,
+        NULL
+    );
+
+    if (mappedHandle == NULL || mappedHandle == (HANDLE)ERROR_ALREADY_EXISTS) {
+        printf("invalid mapped handle\nerr code: %d", GetLastError());
+        return (void*)MemoryMappedFileError;
+    }
+
+    char* fp = (char*)MapViewOfFile(
+        mappedHandle,
+        FILE_MAP_READ,
+        0,
+        0,
+        mapSize
+    );
+
+    if (fp == NULL) {
+        return (void*)MemoryMappedFileError;
+    }
+
+    return fp;
+}
+
+int munmap(void* mapPtr) {
+    if (UnmapViewOfFile(mapPtr) == FALSE) {
+        return -1;
+    }
+    else {
+        return 0;
+    }
+}
+
+ProxError_t windows_main() {
+    char* temp = getenv("TMP");
+    size_t len = strlen(temp) + strlen(fileName) + 1;
+    strcpy(filePath, temp);
+    strcat(filePath, fileName);
+
+    mappedFile = mmap(filePath, 64);
+
+    if ((ProxError_t)mappedFile == FileError) {
         return FileError;
     }
 
-    mappedFile = (char*)mmap(NULL, 64, PROT_READ, MAP_SHARED, fd, 0);
+    if ((ProxError_t)mappedFile == MemoryMappedFileError) {
+        return MemoryMappedFileError;
+    }
 
     ProxError_t err = NoError;
+
+    mmfPeek();
     while (err == NoError && mappedFile[63] != 1) {
-        system("clear");
-        err = readData(mappedFile);
-        print_data();
+        //system("cls");
+        //err = readData(mappedFile);
+        //print_data();
     }
     printf("err: %d\n", err);
 
     return err;
 }
 
-ProxError_t unix_init() {
+ProxError_t windows_init() {
     buf = (char*)malloc(sizeof(float));
-    data = (data_container_t*)malloc(sizeof(data));
-    newContext = (char*)malloc(sizeof(char) * 27);
+    data = (data_container_t*)malloc(64);
+    newContext = (char*)malloc(sizeof(char) * 28);
 
-    if ((fd = open(filePath, O_RDONLY)) == -1) {
-        mumbleAPI.log(ownID, "Failed to open file!\nRun Terraria First!");
+    //Map file to memory here
+    mappedFile = mmap(filePath, 64);
+    if ((ProxError_t)mappedFile == FileError) {
         return FileError;
     }
-
-    mappedFile = (char*)mmap(NULL, 64, PROT_READ, MAP_SHARED, fd, 0);
-
-    if (mappedFile == (char*)-1) {
+    if ((ProxError_t)mappedFile == MemoryMappedFileError) {
         return MemoryMappedFileError;
     }
 
@@ -214,13 +276,17 @@ ProxError_t unix_init() {
 
 mumble_error_t mumble_init(mumble_plugin_id_t pluginID) {
     ownID = pluginID;
+    
 
-    logPath = (char*)malloc(sizeof(char) * 1024);
+    char* temp = getenv("APPDATA");
+    char* append = "\\tModLoaderProxChat.log";
+    size_t len = strlen(temp) + strlen(append) + 1;
 
-    strcpy(logPath, getenv("HOME"));
-    strcat(logPath, "/.local/share/tModLoaderProxChat.log");
+    logPath = (char*)malloc(sizeof(char) * len);
+    strcpy(logPath, temp); // Change to windows version
+    strcat(logPath, append);
 
-    logFp = fopen(logPath, "a");
+    logFp = fopen(logPath, "w");
     fputs("Plugin init: mumble_init()\n", logFp);
 
     if (mumbleAPI.log(ownID, "Terraria ProxChat Initializtion") != MUMBLE_STATUS_OK) {
@@ -281,7 +347,7 @@ mumble_version_t mumble_getVersion() {
 
     version.major = 1;
     version.minor = 0;
-    version.patch = 1;
+    version.patch = 2;
 
     return version;
 }
@@ -319,21 +385,20 @@ uint8_t mumble_initPositionalData(const char *const *programNames, const uint64_
     mumbleAPI.log(ownID, "Positional Data Intitialization");
     fputs("Terraria ProxChat Positional Data Intitialization: mumble_initPositionalData()\n", logFp);
 
-    filePath = (char*)malloc(sizeof(char) * 1024);
+    char* temp = getenv("TMP");
+    size_t len = strlen(temp) + strlen(fileName) + 1;
 
-    strcpy(filePath, getenv("TMPDIR"));
+    filePath = (char*)malloc(sizeof(char) * len);
+    strcpy(filePath, temp);
     strcat(filePath, fileName);
-    
     fprintf(logFp, "filePath: %s\n", filePath);
-
+    
     bool gameIsRunning = false;
     ProxError_t perr;
-
-    fputs("unix_init(): mumble_initPositionalData()\n", logFp);
-    perr = unix_init();
+    fputs("windows_init(): mumble_initPositionalData()\n", logFp);
+    perr = windows_init();
     
     if (perr != NoError) {
-
         fprintf(logFp, "Prox Init failed: mumble_initPositionalData()\nErr code: %d\n", perr);
         fclose(logFp);
 
@@ -347,8 +412,13 @@ uint8_t mumble_initPositionalData(const char *const *programNames, const uint64_
 
     for (int i = 0; i < 3; i++) {
         buf[i] = mappedFile[60 + i];
+        #ifdef DEBUG
+        fprintf(logFp, "mappedFile[%d]: %d\n", 60 + i, mappedFile[60 + i]);
+        #endif
     }
+    buf[3] = 0;
     int tmlPid = *(int*)buf;
+    fprintf(logFp, "tmlPID: %d\n", tmlPid);
 
     for (int i = 0; i < programCount; i++) {
         if (programPIDs[i] == tmlPid) {
@@ -358,6 +428,7 @@ uint8_t mumble_initPositionalData(const char *const *programNames, const uint64_
     }
 
     if (!gameIsRunning) {
+        mumbleAPI.log(ownID, "tModLoader isn't running!");
         fputs("Game isn't running: mumble_initPositionalData()\n", logFp);
         fclose(logFp);
         return MUMBLE_PDEC_ERROR_TEMP;
@@ -384,9 +455,14 @@ bool mumble_fetchPositionalData(float *avatarPos, float *avatarDir, float *avata
 	// Y      | Y
 	// Z      | -
     fputs("Reading mmf: mumble_fetchPositionalData()\n", logFp);
-    readData(mappedFile);
+    ProxError_t err = readData(mappedFile);
+
+    if (err != NoError) {
+        return false;
+    }
 
     if (data->inWorld == 0) {
+        mumbleAPI.log(ownID, "Not in world.");
         fputs("Not in world\n", logFp);
         fclose(logFp);
         return false;
@@ -425,7 +501,8 @@ void mumble_shutdownPositionalData() {
     mumbleAPI.log(ownID, "Positional Shutdown");
     
     fclose(logFp);
-    munmap(mappedFile, 64);
+
+    //WindowsUnmap(mappedFile);
 
     free(buf);
     free(data);
@@ -434,18 +511,26 @@ void mumble_shutdownPositionalData() {
 }
 
 int main() {
-    /*
-    data = (data_container_t*)malloc(sizeof(data));
+    data = (data_container_t*)malloc(64);
     buf = (char*)malloc(sizeof(float));
-    filePath = (char*)malloc(sizeof(char) * 1024);
+    //filePath = (char*)malloc(sizeof(char) * 1024);
+    logPath = (char*)malloc(sizeof(char) * 1024);
     //pid = (int)malloc(sizeof(int));
 
-    printf("error code: %d\n", unix_main());
-    munmap(mappedFile, 64);
+    char* temp = getenv("TMP");
+    size_t len = strlen(temp) + strlen(fileName) + 1;
+
+    filePath = (char*)malloc(sizeof(char) * len);
+    puts("b");
+    strcpy(filePath, temp);
+    strcat(filePath, fileName);
+
+    printf("error code: %d\n", windows_main());
 
     free(buf);              // Automatically gets freed by OS on Process Exit
     free(data);             // But best practice is to manually unmap and free
-    */
+    munmap((void*)mappedFile);
+    free(filePath);
+    free(logPath);
 }
-
 #endif

@@ -76,7 +76,11 @@
 			"tmodloader.h": "c",
 			"unistd.h": "c",
 			"stdlib.h": "c",
-			"stddef.h": "c"
+			"stddef.h": "c",
+			"mumbleplugin_v_1_0_x.h": "c",
+			"mumbleapi_v_1_0_x.h": "c",
+			"types.h": "c",
+			"winnt.h": "c"
 		}
 	}
 }

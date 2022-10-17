@@ -1,5 +1,6 @@
 **/.git
 **/.vscode
+**/.vs
 **/.cmake
 **/build
 CMakeCache.txt
@@ -12,3 +13,4 @@ Makefile
 *.dll
 *.so
 *.dSYM
+*.exe

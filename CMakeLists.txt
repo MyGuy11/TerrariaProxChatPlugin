@@ -9,6 +9,7 @@ project(MumblePlugin
 add_library(plugin
 	SHARED
 		tmodloader.c
+		_tmodloader.c
 )
 
 target_include_directories(plugin
