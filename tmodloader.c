@@ -196,7 +196,7 @@ ProxError_t unix_main() {
 ProxError_t unix_init() {
     buf = (char*)malloc(sizeof(float));
     data = (data_container_t*)malloc(sizeof(data));
-    newContext = (char*)malloc(sizeof(char) * 27);
+    newContext = (char*)malloc(sizeof(char) * 28);
 
     if ((fd = open(filePath, O_RDONLY)) == -1) {
         mumbleAPI.log(ownID, "Failed to open file!\nRun Terraria First!");
@@ -215,12 +215,16 @@ ProxError_t unix_init() {
 mumble_error_t mumble_init(mumble_plugin_id_t pluginID) {
     ownID = pluginID;
 
-    logPath = (char*)malloc(sizeof(char) * 1024);
 
-    strcpy(logPath, getenv("HOME"));
-    strcat(logPath, "/.local/share/tModLoaderProxChat.log");
+    char* temp = getenv("HOME");
+    char* append = "/.local/share/tModLoaderProxChat.log";
+    size_t len = strlen(temp) + strlen(append) + 1;
 
-    logFp = fopen(logPath, "a");
+    logPath = (char*)malloc(sizeof(char) * len);
+    strcpy(logPath, temp);
+    strcat(logPath, append);
+
+    logFp = fopen(logPath, "w");
     fputs("Plugin init: mumble_init()\n", logFp);
 
     if (mumbleAPI.log(ownID, "Terraria ProxChat Initializtion") != MUMBLE_STATUS_OK) {
@@ -319,9 +323,11 @@ uint8_t mumble_initPositionalData(const char *const *programNames, const uint64_
     mumbleAPI.log(ownID, "Positional Data Intitialization");
     fputs("Terraria ProxChat Positional Data Intitialization: mumble_initPositionalData()\n", logFp);
 
-    filePath = (char*)malloc(sizeof(char) * 1024);
+    char* temp = getenv("TMPDIR");
+    size_t len = strlen(temp) + strlen(fileName) + 1;
 
-    strcpy(filePath, getenv("TMPDIR"));
+    filePath = (char*)malloc(sizeof(char) * len);
+    strcpy(filePath, temp);
     strcat(filePath, fileName);
     
     fprintf(logFp, "filePath: %s\n", filePath);
@@ -348,6 +354,7 @@ uint8_t mumble_initPositionalData(const char *const *programNames, const uint64_
     for (int i = 0; i < 3; i++) {
         buf[i] = mappedFile[60 + i];
     }
+    buf[3] = 0;
     int tmlPid = *(int*)buf;
 
     for (int i = 0; i < programCount; i++) {
