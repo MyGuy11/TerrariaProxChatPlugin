@@ -511,6 +511,7 @@ void mumble_shutdownPositionalData() {
 }
 
 int main() {
+    /*
     data = (data_container_t*)malloc(64);
     buf = (char*)malloc(sizeof(float));
     //filePath = (char*)malloc(sizeof(char) * 1024);
@@ -532,5 +533,6 @@ int main() {
     munmap((void*)mappedFile);
     free(filePath);
     free(logPath);
+    */
 }
 #endif
