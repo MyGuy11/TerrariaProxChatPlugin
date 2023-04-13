@@ -3,6 +3,7 @@
 **/.vs
 **/.cmake
 **/build
+**/out
 CMakeCache.txt
 *.DS_Store
 **/CMakeFiles

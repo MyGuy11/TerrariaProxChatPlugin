@@ -1,8 +1,12 @@
 // Author.name = MyGuy
 
 // Why does every std function have an underscore in front on windows
+// Found out those are special versions, the std versions are normal
+// But still, why
+
 #ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS
+#define DEBUG
 
 #include "include/mumble/MumbleAPI_v_1_0_x.h"
 #include "include/mumble/MumblePlugin_v_1_0_x.h"
@@ -31,11 +35,6 @@ data_container_t* data;
 ProxError_t readData(char* mmfPtr) {
     data->inWorld = mmfPtr[11];
 
-    /*
-    if (data->inWorld == 0){
-        return NoError;
-    }
-    */
     for (int i = 0; i < 4; i++) {
         buf[i] = (byte)mmfPtr[i];
         #ifdef DEBUG
@@ -127,6 +126,7 @@ void print_data() {
 
 void log_data() {
     //printf("%s\n", filePath);
+    #ifdef DEBUG
     fprintf(logFp, "PosX: %.6f\n", data->posX);
     fprintf(logFp, "PosY: %.6f\n", data->posY);
     fprintf(logFp, "Team: %d\n", data->team);
@@ -134,6 +134,7 @@ void log_data() {
     fprintf(logFp, "RadioChannel: %d\n", data->radioChannel);
     fprintf(logFp, "InWorld: %d\n", data->inWorld);
     fprintf(logFp, "NameLen: %d\n", data->nameLen);
+    #endif
 
     for (int i = 0; i < data->nameLen; i++) {
         switch (i) {
@@ -186,7 +187,7 @@ void* mmap(char* filePath, int mapSize) {
     );
 
     if (handle == INVALID_HANDLE_VALUE) {
-        printf("invalid handle\nerr code: %d", GetLastError());
+        printf("invalid handle: err code: %lu\n", GetLastError());
         return (void*)FileError;
     }
 
@@ -200,7 +201,7 @@ void* mmap(char* filePath, int mapSize) {
     );
 
     if (mappedHandle == NULL || mappedHandle == (HANDLE)ERROR_ALREADY_EXISTS) {
-        printf("invalid mapped handle\nerr code: %d", GetLastError());
+        printf("invalid mapped handle\nerr code: %lu", GetLastError());
         return (void*)MemoryMappedFileError;
     }
 
@@ -230,7 +231,6 @@ int munmap(void* mapPtr) {
 
 ProxError_t windows_main() {
     char* temp = getenv("TMP");
-    size_t len = strlen(temp) + strlen(fileName) + 1;
     strcpy(filePath, temp);
     strcat(filePath, fileName);
 
@@ -259,8 +259,16 @@ ProxError_t windows_main() {
 
 ProxError_t windows_init() {
     buf = (char*)malloc(sizeof(float));
-    data = (data_container_t*)malloc(64);
+    data = (data_container_t*)malloc(sizeof(data_container_t));
     newContext = (char*)malloc(sizeof(char) * 28);
+
+    if (buf == NULL  || 
+        data == NULL || 
+        newContext == NULL
+    ) {
+        mumbleAPI.log(ownID, "malloc failed for init() vars, fatal error");
+        return MallocError;
+    }
 
     //Map file to memory here
     mappedFile = mmap(filePath, 64);
@@ -281,8 +289,11 @@ mumble_error_t mumble_init(mumble_plugin_id_t pluginID) {
     char* temp = getenv("APPDATA");
     char* append = "\\tModLoaderProxChat.log";
     size_t len = strlen(temp) + strlen(append) + 1;
-
     logPath = (char*)malloc(sizeof(char) * len);
+    if (logPath == NULL) {
+        mumbleAPI.log(ownID, "malloc failed for logPath, fatal error");
+        return MUMBLE_EC_GENERIC_ERROR;
+    }
     strcpy(logPath, temp); // Change to windows version
     strcat(logPath, append);
 
@@ -346,8 +357,8 @@ mumble_version_t mumble_getVersion() {
     mumble_version_t version;
 
     version.major = 1;
-    version.minor = 0;
-    version.patch = 2;
+    version.minor = 1;
+    version.patch = 10;
 
     return version;
 }
@@ -389,12 +400,16 @@ uint8_t mumble_initPositionalData(const char *const *programNames, const uint64_
     size_t len = strlen(temp) + strlen(fileName) + 1;
 
     filePath = (char*)malloc(sizeof(char) * len);
+    if (filePath == NULL) {
+        mumbleAPI.log(ownID, "malloc failed for filePath, fatal error");
+        return MUMBLE_PDEC_ERROR_TEMP;
+    }
     strcpy(filePath, temp);
     strcat(filePath, fileName);
     fprintf(logFp, "filePath: %s\n", filePath);
     
     bool gameIsRunning = false;
-    ProxError_t perr;
+    ProxError_t perr = -1;
     fputs("windows_init(): mumble_initPositionalData()\n", logFp);
     perr = windows_init();
     
@@ -449,27 +464,34 @@ bool mumble_fetchPositionalData(float *avatarPos, float *avatarDir, float *avata
 	// have to be set to 0 or the empty String ""
 
     logFp = fopen(logPath, "a");
+    if (data == (data_container_t*)0) {
+        mumbleAPI.log(ownID, "data is null");
+        fputs("data is null\n", logFp);
+        fclose(logFp);
+        return false;
+    }
 
     // Mumble | Game
 	// X      | X
 	// Y      | Y
 	// Z      | -
+
     fputs("Reading mmf: mumble_fetchPositionalData()\n", logFp);
     ProxError_t err = readData(mappedFile);
 
     if (err != NoError) {
-        return false;
+        mumbleAPI.log(ownID, "Error " + err);
+        fputs("mmf read error, err code: " + err + '\n', logFp);
+        return false; 
     }
 
     if (data->inWorld == 0) {
         mumbleAPI.log(ownID, "Not in world.");
         fputs("Not in world\n", logFp);
-        fclose(logFp);
         return false;
     }
 
     log_data();
-    fclose(logFp);
 
     for (int i = 0; i < 3; i++) {
         avatarPos[i] = cameraPos[i] = 0.0f;
@@ -482,13 +504,17 @@ bool mumble_fetchPositionalData(float *avatarPos, float *avatarDir, float *avata
 
     strcpy(newContext, data->worldName);
 
-    newContext[data->worldNameLen] = data->dead == 1 ? 't' : data->team;
+    newContext[data->worldNameLen] = data->dead == 1 ? '-1' : data->team;
+    newContext[data->worldNameLen + 1] = '\0';
     *context = newContext;
+    fprintf(logFp, "context: %s\n", *context);
 
     *identity = data->name;
+    fprintf(logFp, "identity: %s\n", *identity);
+
+    fclose(logFp);
 
     // If positional data could be fetched successfully
-
     return true;
 	// otherwise return false
 }
@@ -497,17 +523,24 @@ void mumble_shutdownPositionalData() {
 	// Unlink the connection to the supported game
     // Perform potential clean-up code
     logFp = fopen(logPath, "a");
+    data = (data_container_t*)0;
     fputs("Positional Shutdown: mumble_shutdownPositionalData()\n", logFp);
     mumbleAPI.log(ownID, "Positional Shutdown");
     
-    fclose(logFp);
+    
 
-    //WindowsUnmap(mappedFile);
+    // WindowsUnmap(mappedFile);
+    if (munmap(mappedFile) != 0) {
+        mumbleAPI.log(ownID, "Munmap failure!");
+        fputs("Munmap failure!\n", logFp);
+    }
 
     free(buf);
     free(data);
     free(filePath);
     free(newContext);
+    fputs("Freed vars\n", logFp);
+    fclose(logFp);
 }
 
 int main() {
@@ -520,13 +553,12 @@ int main() {
 
     char* temp = getenv("TMP");
     size_t len = strlen(temp) + strlen(fileName) + 1;
-
     filePath = (char*)malloc(sizeof(char) * len);
-    puts("b");
     strcpy(filePath, temp);
     strcat(filePath, fileName);
+    printf("%s\n", filePath);
 
-    printf("error code: %d\n", windows_main());
+    //printf("error code: %d\n", windows_main());
 
     free(buf);              // Automatically gets freed by OS on Process Exit
     free(data);             // But best practice is to manually unmap and free

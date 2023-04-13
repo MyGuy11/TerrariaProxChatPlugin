@@ -28,7 +28,7 @@ typedef enum ProxError {
     MemoryMappedFileError = 0x2,
     TerrariaExit          = 0x3,
     RecievedExitMessage   = 0x4,
-
+    MallocError           = 0x5,
 } ProxError_t;
 
 #endif

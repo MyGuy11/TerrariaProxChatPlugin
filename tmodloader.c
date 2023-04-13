@@ -31,10 +31,6 @@ data_container_t* data;
 ProxError_t readData(char* mmfPtr) {
     data->inWorld = mmfPtr[11];
 
-    if (data->inWorld == 0){
-        return NoError;
-    }
-
     for (int i = 0; i < 4; i++) {
         buf[i] = (byte)mmfPtr[i];
         #ifdef DEBUG
@@ -126,6 +122,7 @@ void print_data() {
 
 void log_data() {
     //printf("%s\n", filePath);
+    #ifdef DEBUG
     fprintf(logFp, "PosX: %.6f\n", data->posX);
     fprintf(logFp, "PosY: %.6f\n", data->posY);
     fprintf(logFp, "Team: %d\n", data->team);
@@ -133,7 +130,8 @@ void log_data() {
     fprintf(logFp, "RadioChannel: %d\n", data->radioChannel);
     fprintf(logFp, "InWorld: %d\n", data->inWorld);
     fprintf(logFp, "NameLen: %d\n", data->nameLen);
-
+    #endif
+    
     for (int i = 0; i < data->nameLen; i++) {
         switch (i) {
             case 0:
@@ -163,15 +161,20 @@ void log_data() {
 
 void mmfPeek() {
     system("clear");
-    for (int i = 13; i < 64; i++) {
+    for (int i = 0; i < 64; i++) {
         printf("mappedFile[%d]: %c\n", i, mappedFile[i]);
+        if (i > 59 && i < 63) {
+            printf("mappedFile[%d]: %d\n", i, mappedFile[i]);
+        }
     }
     
 }
 
 ProxError_t unix_main() {
-    strcpy(filePath, getenv("TMPDIR"));
-    strcat(filePath, fileName);
+    char* env = getenv("TMPDIR");
+    size_t len = strlen(env) + strlen(fileName) + 1;
+    strlcpy(filePath, getenv("TMPDIR"), len);
+    strlcat(filePath, fileName, len);
     
 
     if ((fd = open(filePath, O_RDONLY)) == -1) {
@@ -215,14 +218,13 @@ ProxError_t unix_init() {
 mumble_error_t mumble_init(mumble_plugin_id_t pluginID) {
     ownID = pluginID;
 
-
-    char* temp = getenv("HOME");
-    char* append = "/.local/share/tModLoaderProxChat.log";
-    size_t len = strlen(temp) + strlen(append) + 1;
-
+    char* env = getenv("HOME");
+    char* logAppend = "/.local/share/tModLoaderProxChat.log";
+    size_t len = strlen(env) + strlen(logAppend) + 1;
     logPath = (char*)malloc(sizeof(char) * len);
-    strcpy(logPath, temp);
-    strcat(logPath, append);
+
+    strlcpy(logPath, env, len);
+    strlcat(logPath, env, len);
 
     logFp = fopen(logPath, "w");
     fputs("Plugin init: mumble_init()\n", logFp);
@@ -323,12 +325,11 @@ uint8_t mumble_initPositionalData(const char *const *programNames, const uint64_
     mumbleAPI.log(ownID, "Positional Data Intitialization");
     fputs("Terraria ProxChat Positional Data Intitialization: mumble_initPositionalData()\n", logFp);
 
-    char* temp = getenv("TMPDIR");
-    size_t len = strlen(temp) + strlen(fileName) + 1;
-
+    char* env = getenv("TMPDIR");
+    size_t len = strlen(env) + strlen(fileName) + 1;
     filePath = (char*)malloc(sizeof(char) * len);
-    strcpy(filePath, temp);
-    strcat(filePath, fileName);
+    strlcpy(filePath, env, len);
+    strlcat(filePath, fileName, len);
     
     fprintf(logFp, "filePath: %s\n", filePath);
 
@@ -396,7 +397,7 @@ bool mumble_fetchPositionalData(float *avatarPos, float *avatarDir, float *avata
     if (data->inWorld == 0) {
         fputs("Not in world\n", logFp);
         fclose(logFp);
-        return false;
+        return true;
     }
 
     log_data();

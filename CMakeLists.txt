@@ -12,6 +12,10 @@ add_library(plugin
 		_tmodloader.c
 )
 
+#add_executable(test
+#	_tmodloader.c
+#)
+
 target_include_directories(plugin
 	PUBLIC "${CMAKE_SOURCE_DIR}/include/"
 )
