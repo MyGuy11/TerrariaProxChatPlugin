@@ -6,16 +6,17 @@ project(MumblePlugin
 	LANGUAGES "C"
 )
 
-add_library(plugin
+add_library(TerrariaPlugin
 	SHARED
 		tmodloader.c
 		_tmodloader.c
 )
 
-#add_executable(test
-#	_tmodloader.c
-#)
+add_executable(test
+	_tmodloader.c
+	tmodloader.c
+)
 
-target_include_directories(plugin
+target_include_directories(TerrariaPlugin
 	PUBLIC "${CMAKE_SOURCE_DIR}/include/"
 )

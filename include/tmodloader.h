@@ -3,22 +3,24 @@
 #ifndef TMODLOADER_PROX_CHAT
 #define TMODLOADER_PROX_CHAT
 
-// I later learned that uint8_t exists :|
 // C# moment (It's the syntax I'm familiar with, ok)
+// I later learned that uint8_t exists :|
 typedef unsigned char byte;
 
-// Comments next to fields indicate starting byte
+// Comments next to fields indicate byte / range
 typedef struct data_container {
-    float posX; // 0
-    float posY; // 4
+    float posX; // 0 - 3
+    float posY; // 4 - 7
     byte team; // 8
     byte dead; // 9
     byte radioChannel; // 10
     byte inWorld; // 11
     byte nameLen; // 12
-    char* name; // 13 - 32
-    byte worldNameLen; // 33
-    char* worldName; // 34 - 60
+    char* name; // 13 - 34
+    byte worldNameLen; // 35
+    char* worldName; // 36 - 63
+    // int pid; 64 - 66
+    byte teamRestrict; // 67
 
 } data_container_t;
 

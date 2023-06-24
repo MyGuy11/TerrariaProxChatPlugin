@@ -56,8 +56,8 @@ ProxError_t readData(char* mmfPtr) {
     data->radioChannel = mmfPtr[10];
     data->nameLen = mmfPtr[12];
     data->name = &mmfPtr[13];
-    data->worldNameLen = mmfPtr[33];
-    data->worldName = &mmfPtr[34];
+    data->worldNameLen = mmfPtr[35];
+    data->worldName = &mmfPtr[36];
 
     #ifdef DEBUG
     printf("mmf[%d]: %u\n", 8, mmfPtr[8]);
@@ -502,7 +502,7 @@ bool mumble_fetchPositionalData(float *avatarPos, float *avatarDir, float *avata
     avatarPos[0] = cameraPos[0] = data->posX;
     avatarPos[1] = cameraPos[1] = data->posY;
 
-    strcpy(newContext, data->worldName);
+    strlcpy(newContext, data->worldName, sizeof(char) * 28);
 
     newContext[data->worldNameLen] = data->dead == 1 ? '-1' : data->team;
     newContext[data->worldNameLen + 1] = '\0';

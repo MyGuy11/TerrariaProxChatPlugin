@@ -52,8 +52,9 @@ ProxError_t readData(char* mmfPtr) {
     data->radioChannel = mmfPtr[10];
     data->nameLen = mmfPtr[12];
     data->name = &mmfPtr[13];
-    data->worldNameLen = mmfPtr[33];
-    data->worldName = &mmfPtr[34];
+    data->worldNameLen = mmfPtr[35];
+    data->worldName = &mmfPtr[36];
+    data->teamRestrict = mmfPtr[67];
 
     #ifdef DEBUG
     printf("mmf[%d]: %u\n", 8, mmfPtr[8]);
@@ -183,10 +184,10 @@ ProxError_t unix_main() {
         return FileError;
     }
 
-    mappedFile = (char*)mmap(NULL, 64, PROT_READ, MAP_SHARED, fd, 0);
+    mappedFile = (char*)mmap(NULL, 128, PROT_READ, MAP_SHARED, fd, 0);
 
     ProxError_t err = NoError;
-    while (err == NoError && mappedFile[63] != 1) {
+    while (err == NoError && mappedFile[127] != 1) {
         system("clear");
         err = readData(mappedFile);
         print_data();
@@ -203,6 +204,7 @@ ProxError_t unix_init() {
 
     if ((fd = open(filePath, O_RDONLY)) == -1) {
         mumbleAPI.log(ownID, "Failed to open file!\nRun Terraria First!");
+        
         return FileError;
     }
 
@@ -224,7 +226,7 @@ mumble_error_t mumble_init(mumble_plugin_id_t pluginID) {
     logPath = (char*)malloc(sizeof(char) * len);
 
     strlcpy(logPath, env, len);
-    strlcat(logPath, env, len);
+    strlcat(logPath, logAppend, len);
 
     logFp = fopen(logPath, "w");
     fputs("Plugin init: mumble_init()\n", logFp);
@@ -286,8 +288,8 @@ mumble_version_t mumble_getVersion() {
     mumble_version_t version;
 
     version.major = 1;
-    version.minor = 0;
-    version.patch = 1;
+    version.minor = 1;
+    version.patch = 10;
 
     return version;
 }
@@ -353,7 +355,7 @@ uint8_t mumble_initPositionalData(const char *const *programNames, const uint64_
     }
 
     for (int i = 0; i < 3; i++) {
-        buf[i] = mappedFile[60 + i];
+        buf[i] = mappedFile[64 + i];
     }
     buf[3] = 0;
     int tmlPid = *(int*)buf;
@@ -412,11 +414,12 @@ bool mumble_fetchPositionalData(float *avatarPos, float *avatarDir, float *avata
     avatarPos[0] = cameraPos[0] = data->posX;
     avatarPos[1] = cameraPos[1] = data->posY;
 
-    strcpy(newContext, data->worldName);
+    strlcpy(newContext, data->worldName, sizeof(char) * 28);
 
-    newContext[data->worldNameLen] = data->dead == 1 ? 't' : data->team;
+    if (data->teamRestrict) {
+        newContext[data->worldNameLen] = data->dead == 1 ? 'd' : data->team;
+    }
     *context = newContext;
-
     *identity = data->name;
 
     // If positional data could be fetched successfully
@@ -442,6 +445,17 @@ void mumble_shutdownPositionalData() {
 }
 
 int main() {
+
+    char* env = getenv("HOME");
+    char* logAppend = "/.local/share/tModLoaderProxChat.log";
+    size_t len = strlen(env) + strlen(logAppend) + 1;
+    logPath = (char*)malloc(sizeof(char) * len);
+
+    strlcpy(logPath, env, len);
+    strlcat(logPath, logAppend, len);
+
+    printf("%s\n", logPath);
+
     /*
     data = (data_container_t*)malloc(sizeof(data));
     buf = (char*)malloc(sizeof(float));
