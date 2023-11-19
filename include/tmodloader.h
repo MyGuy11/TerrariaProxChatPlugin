@@ -8,7 +8,7 @@
 typedef unsigned char byte;
 
 // Comments next to fields indicate byte / range
-typedef struct data_container {
+typedef struct data_container { // 128 bytes
     float posX; // 0 - 3
     float posY; // 4 - 7
     byte team; // 8
@@ -21,6 +21,7 @@ typedef struct data_container {
     char* worldName; // 36 - 63
     // int pid; 64 - 66
     byte teamRestrict; // 67
+    // bool data_dumper_toggle // 127
 
 } data_container_t;
 

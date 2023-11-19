@@ -357,7 +357,7 @@ uint8_t mumble_initPositionalData(const char *const *programNames, const uint64_
     for (int i = 0; i < 3; i++) {
         buf[i] = mappedFile[64 + i];
     }
-    buf[3] = 0;
+    buf[3] = 0; // Only using 3 out of 4 bytes
     int tmlPid = *(int*)buf;
 
     for (int i = 0; i < programCount; i++) {
@@ -443,7 +443,7 @@ void mumble_shutdownPositionalData() {
     free(filePath);
     free(newContext);
 }
-
+/*
 int main() {
 
     char* env = getenv("HOME");
@@ -456,7 +456,6 @@ int main() {
 
     printf("%s\n", logPath);
 
-    /*
     data = (data_container_t*)malloc(sizeof(data));
     buf = (char*)malloc(sizeof(float));
     filePath = (char*)malloc(sizeof(char) * 1024);
@@ -467,7 +466,7 @@ int main() {
 
     free(buf);              // Automatically gets freed by OS on Process Exit
     free(data);             // But best practice is to manually unmap and free
-    */
 }
+*/
 
 #endif
