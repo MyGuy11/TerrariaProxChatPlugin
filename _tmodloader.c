@@ -32,6 +32,20 @@ char* mappedFile;
 char* newContext;
 data_container_t* data;
 
+size_t strlcpy(char* dst, const char* src, size_t size) {
+    // Thx Apple
+    // https://opensource.apple.com/source/xnu/xnu-4570.1.46/osfmk/arm/strlcpy.c.auto.html
+    const size_t srclen = strlen(src);
+    if (srclen + 1 < size) {
+        memcpy(dst, src, srclen + 1);
+    }
+    else if (size != 0) {
+        memcpy(dst, src, size - 1);
+        dst[size - 1] = '\0';
+    }
+    return srclen;
+}
+
 ProxError_t readData(char* mmfPtr) {
     data->inWorld = mmfPtr[11];
 
