@@ -24,12 +24,16 @@ char* logPath;
 FILE* logFp;
 
 int fd;
-char* mappedFile;
-char* newContext;
+char* mmf;
+char* new_context;
 data_container_t* data;
 
 ProxError_t readData(char* mmfPtr) {
-    data->inWorld = mmfPtr[11];
+    for (int i = 0; i < 3; i++) {
+        buf[i] = mmfPtr[64 + i];
+    }
+    buf[3] = 0; // Only using 3 out of 4 bytes
+    data->pid = *(int*)buf;
 
     for (int i = 0; i < 4; i++) {
         buf[i] = (byte)mmfPtr[i];
@@ -49,12 +53,13 @@ ProxError_t readData(char* mmfPtr) {
 
     data->team = mmfPtr[8];
     data->dead = mmfPtr[9];
-    data->radioChannel = mmfPtr[10];
+    data->radio_channel = mmfPtr[10];
+    data->inWorld = mmfPtr[11];
     data->nameLen = mmfPtr[12];
     data->name = &mmfPtr[13];
-    data->worldNameLen = mmfPtr[35];
-    data->worldName = &mmfPtr[36];
-    data->teamRestrict = mmfPtr[67];
+    data->world_name_len = mmfPtr[35];
+    data->world_name = &mmfPtr[36];
+    data->team_restrict = mmfPtr[67];
 
     #ifdef DEBUG
     printf("mmf[%d]: %u\n", 8, mmfPtr[8]);
@@ -90,7 +95,7 @@ void print_data() {
     printf("PosY: %.6f\n", data->posY);
     printf("Team: %d\n", data->team);
     printf("Dead: %d\n", data->dead);
-    printf("RadioChannel: %d\n", data->radioChannel);
+    printf("RadioChannel: %d\n", data->radio_channel);
     printf("InWorld: %d\n", data->inWorld);
     printf("NameLen: %d\n", data->nameLen);
 
@@ -106,16 +111,16 @@ void print_data() {
     }
     printf("\n");
 
-    printf("WorldNameLen: %d\n", data->worldNameLen);
+    printf("WorldNameLen: %d\n", data->world_name_len);
 
-    for (int i = 0; i < data->worldNameLen; i++) {
+    for (int i = 0; i < data->world_name_len; i++) {
         switch (i) {
             case 0:
-                printf("WorldName: %c", data->worldName[i]);
+                printf("WorldName: %c", data->world_name[i]);
                 break;
                 
             default:
-                printf("%c", data->worldName[i]);
+                printf("%c", data->world_name[i]);
         }
     }
     printf("\n");
@@ -128,7 +133,7 @@ void log_data() {
     fprintf(logFp, "PosY: %.6f\n", data->posY);
     fprintf(logFp, "Team: %d\n", data->team);
     fprintf(logFp, "Dead: %d\n", data->dead);
-    fprintf(logFp, "RadioChannel: %d\n", data->radioChannel);
+    fprintf(logFp, "RadioChannel: %d\n", data->radio_channel);
     fprintf(logFp, "InWorld: %d\n", data->inWorld);
     fprintf(logFp, "NameLen: %d\n", data->nameLen);
     #endif
@@ -145,16 +150,16 @@ void log_data() {
     }
     fprintf(logFp, "\n");
 
-    fprintf(logFp, "WorldNameLen: %d\n", data->worldNameLen);
+    fprintf(logFp, "WorldNameLen: %d\n", data->world_name_len);
 
-    for (int i = 0; i < data->worldNameLen; i++) {
+    for (int i = 0; i < data->world_name_len; i++) {
         switch (i) {
             case 0:
-                fprintf(logFp, "WorldName: %c", data->worldName[i]);
+                fprintf(logFp, "WorldName: %c", data->world_name[i]);
                 break;
                 
             default:
-                fprintf(logFp, "%c", data->worldName[i]);
+                fprintf(logFp, "%c", data->world_name[i]);
         }
     }
     fprintf(logFp, "\n");
@@ -163,44 +168,20 @@ void log_data() {
 void mmfPeek() {
     system("clear");
     for (int i = 0; i < 64; i++) {
-        printf("mappedFile[%d]: %c\n", i, mappedFile[i]);
+        printf("mmf[%d]: %c\n", i, mmf[i]);
         if (i > 59 && i < 63) {
-            printf("mappedFile[%d]: %d\n", i, mappedFile[i]);
+            printf("mmf[%d]: %d\n", i, mmf[i]);
         }
     }
     
 }
 
-ProxError_t unix_main() {
-    char* env = getenv("TMPDIR");
-    size_t len = strlen(env) + strlen(fileName) + 1;
-    strlcpy(filePath, getenv("TMPDIR"), len);
-    strlcat(filePath, fileName, len);
-    
-
-    if ((fd = open(filePath, O_RDONLY)) == -1) {
-        perror("open failed");
-        printf("run terraria first!\n"); // Convert to mumble error in the init function
-        return FileError;
-    }
-
-    mappedFile = (char*)mmap(NULL, 128, PROT_READ, MAP_SHARED, fd, 0);
-
-    ProxError_t err = NoError;
-    while (err == NoError && mappedFile[127] != 1) {
-        system("clear");
-        err = readData(mappedFile);
-        print_data();
-    }
-    printf("err: %d\n", err);
-
-    return err;
-}
-
 ProxError_t unix_init() {
     buf = (char*)malloc(sizeof(float));
     data = (data_container_t*)malloc(sizeof(data));
-    newContext = (char*)malloc(sizeof(char) * 28);
+    new_context = (char*)malloc(sizeof(char) * 28);
+
+    if (buf == NULL || data == NULL || new_context == NULL)
 
     if ((fd = open(filePath, O_RDONLY)) == -1) {
         mumbleAPI.log(ownID, "Failed to open file!\nRun Terraria First!");
@@ -208,9 +189,9 @@ ProxError_t unix_init() {
         return FileError;
     }
 
-    mappedFile = (char*)mmap(NULL, 64, PROT_READ, MAP_SHARED, fd, 0);
+    mmf = (char*)mmap(NULL, 128, PROT_READ, MAP_SHARED, fd, 0);
 
-    if (mappedFile == (char*)-1) {
+    if (mmf == (char*)-1) {
         return MemoryMappedFileError;
     }
 
@@ -237,22 +218,56 @@ mumble_error_t mumble_init(mumble_plugin_id_t pluginID) {
 
         fputs("Mumble didn't log: mumble_init()\n", logFp);
     }
-    fclose(logFp);
+    
+    // MMF setup
+    env = getenv("TMPDIR");
+    len = strlen(env) + strlen(fileName) + 1;
+    filePath = (char*)malloc(sizeof(char) * len);
+    strlcpy(filePath, env, len);
+    strlcat(filePath, fileName, len);
+    
+    fprintf(logFp, "filePath: %s\n", filePath);
 
+    ProxError_t perr;
+
+    fputs("unix_init(): mumble_init()\n", logFp);
+    perr = unix_init();
+    
+    if (perr != NoError) {
+
+        fprintf(logFp, "Prox Init failed: mumble_init()\nErr code: %d\n", perr);
+        fclose(logFp);
+
+        char* ec_buffer = (char*)malloc(1024);
+        strcat(ec_buffer, "Initialization failed!\nCheck Error Log!\nError: ");
+        mumbleAPI.log(ownID, strcat(ec_buffer, proxerror_tostring(perr)));
+        mumbleAPI.log(ownID, ec_buffer);
+        mumbleAPI.log(ownID, logPath);
+
+        return MUMBLE_EC_GENERIC_ERROR;
+    }
+
+    fclose(logFp);
     return MUMBLE_STATUS_OK;
 }
 
 void mumble_shutdown() {
     logFp = fopen(logPath, "a");
     fputs("shutting down plugin: mumble_shutdown()\n", logFp);
-    fclose(logFp);
 
-    free(logPath);
+    munmap(mmf, 64);
+    free(buf);
+    free(data);
+    free(filePath);
+    free(new_context);
 
 	if (mumbleAPI.log(ownID, "Plugin Shutdown") != MUMBLE_STATUS_OK) {
 		// Logging failed -> usually you'd probably want to log things like this in your plugin's
 		// logging system (if there is any)
+        fputs("failed to shutdown plugin!: mumble_shutdown()\n", logFp);
     }
+    fclose(logFp);
+    free(logPath);
 }
 
 struct MumbleStringWrapper mumble_getName() {
@@ -288,8 +303,8 @@ mumble_version_t mumble_getVersion() {
     mumble_version_t version;
 
     version.major = 1;
-    version.minor = 1;
-    version.patch = 10;
+    version.minor = 2;
+    version.patch = 5;
 
     return version;
 }
@@ -327,41 +342,18 @@ uint8_t mumble_initPositionalData(const char *const *programNames, const uint64_
     mumbleAPI.log(ownID, "Positional Data Intitialization");
     fputs("Terraria ProxChat Positional Data Intitialization: mumble_initPositionalData()\n", logFp);
 
-    char* env = getenv("TMPDIR");
-    size_t len = strlen(env) + strlen(fileName) + 1;
-    filePath = (char*)malloc(sizeof(char) * len);
-    strlcpy(filePath, env, len);
-    strlcat(filePath, fileName, len);
-    
-    fprintf(logFp, "filePath: %s\n", filePath);
-
     bool gameIsRunning = false;
-    ProxError_t perr;
 
-    fputs("unix_init(): mumble_initPositionalData()\n", logFp);
-    perr = unix_init();
-    
-    if (perr != NoError) {
-
-        fprintf(logFp, "Prox Init failed: mumble_initPositionalData()\nErr code: %d\n", perr);
-        fclose(logFp);
-
-        mumbleAPI.log(ownID, "Initialization failed! Check Error Log!");
-        mumbleAPI.log(ownID, logPath);
-        mumbleAPI.log(ownID, "Ignore the permanent error below, I had to stop mumble from spamming mumble_initPositionalData on an error");
-        mumbleAPI.log(ownID, "Make sure to re-enable positional audio in the plugin settings.");
-
+    if (data == NULL) {
         return MUMBLE_PDEC_ERROR_PERM;
     }
 
-    for (int i = 0; i < 3; i++) {
-        buf[i] = mappedFile[64 + i];
+    if (mmf == NULL) {
+
     }
-    buf[3] = 0; // Only using 3 out of 4 bytes
-    int tmlPid = *(int*)buf;
 
     for (int i = 0; i < programCount; i++) {
-        if (programPIDs[i] == tmlPid) {
+        if (programPIDs[i] == data->pid) {
             fputs("Game is running: mumble_initPositionalData()\n", logFp);
             gameIsRunning = true;
         }
@@ -394,12 +386,12 @@ bool mumble_fetchPositionalData(float *avatarPos, float *avatarDir, float *avata
 	// Y      | Y
 	// Z      | -
     fputs("Reading mmf: mumble_fetchPositionalData()\n", logFp);
-    readData(mappedFile);
+    readData(mmf);
 
     if (data->inWorld == 0) {
         fputs("Not in world\n", logFp);
         fclose(logFp);
-        return true;
+        return false;
     }
 
     log_data();
@@ -414,12 +406,12 @@ bool mumble_fetchPositionalData(float *avatarPos, float *avatarDir, float *avata
     avatarPos[0] = cameraPos[0] = data->posX;
     avatarPos[1] = cameraPos[1] = data->posY;
 
-    strlcpy(newContext, data->worldName, sizeof(char) * 28);
+    strlcpy(new_context, data->world_name, sizeof(char) * 28);
 
-    if (data->teamRestrict) {
-        newContext[data->worldNameLen] = data->dead == 1 ? 'd' : data->team;
+    if (data->team_restrict) {
+        new_context[data->world_name_len] = data->dead == 1 ? 'd' : data->team;
     }
-    *context = newContext;
+    *context = new_context;
     *identity = data->name;
 
     // If positional data could be fetched successfully
@@ -436,14 +428,43 @@ void mumble_shutdownPositionalData() {
     mumbleAPI.log(ownID, "Positional Shutdown");
     
     fclose(logFp);
-    munmap(mappedFile, 64);
+    /*
+    munmap(mmf, 64);
 
     free(buf);
     free(data);
     free(filePath);
-    free(newContext);
+    free(new_context);
+    */
 }
+
 /*
+ProxError_t unix_main() {
+    char* env = getenv("TMPDIR");
+    size_t len = strlen(env) + strlen(fileName) + 1;
+    strlcpy(filePath, getenv("TMPDIR"), len);
+    strlcat(filePath, fileName, len);
+    
+
+    if ((fd = open(filePath, O_RDONLY)) == -1) {
+        perror("open failed");
+        printf("run terraria first!\n"); // Convert to mumble error in the init function
+        return FileError;
+    }
+
+    mmf = (char*)mmap(NULL, 128, PROT_READ, MAP_SHARED, fd, 0);
+
+    ProxError_t err = NoError;
+    while (err == NoError && mmf[127] != 1) {
+        system("clear");
+        err = readData(mmf);
+        print_data();
+    }
+    printf("err: %d\n", err);
+
+    return err;
+}
+
 int main() {
 
     char* env = getenv("HOME");
@@ -462,7 +483,7 @@ int main() {
     //pid = (int)malloc(sizeof(int));
 
     printf("error code: %d\n", unix_main());
-    munmap(mappedFile, 64);
+    munmap(mmf, 64);
 
     free(buf);              // Automatically gets freed by OS on Process Exit
     free(data);             // But best practice is to manually unmap and free

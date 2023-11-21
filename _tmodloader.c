@@ -28,7 +28,7 @@ char* buf;
 char* logPath;
 FILE* logFp;
 
-char* mappedFile;
+char* mmf;
 char* newContext;
 data_container_t* data;
 
@@ -67,11 +67,11 @@ ProxError_t readData(char* mmfPtr) {
 
     data->team = mmfPtr[8];
     data->dead = mmfPtr[9];
-    data->radioChannel = mmfPtr[10];
+    data->radio_channel = mmfPtr[10];
     data->nameLen = mmfPtr[12];
     data->name = &mmfPtr[13];
-    data->worldNameLen = mmfPtr[35];
-    data->worldName = &mmfPtr[36];
+    data->world_name_len = mmfPtr[35];
+    data->world_name = &mmfPtr[36];
 
     #ifdef DEBUG
     printf("mmf[%d]: %u\n", 8, mmfPtr[8]);
@@ -107,7 +107,7 @@ void print_data() {
     printf("PosY: %.6f\n", data->posY);
     printf("Team: %d\n", data->team);
     printf("Dead: %d\n", data->dead);
-    printf("RadioChannel: %d\n", data->radioChannel);
+    printf("RadioChannel: %d\n", data->radio_channel);
     printf("InWorld: %d\n", data->inWorld);
     printf("NameLen: %d\n", data->nameLen);
 
@@ -123,16 +123,16 @@ void print_data() {
     }
     printf("\n");
 
-    printf("WorldNameLen: %d\n", data->worldNameLen);
+    printf("WorldNameLen: %d\n", data->world_name_len);
 
-    for (int i = 0; i < data->worldNameLen; i++) {
+    for (int i = 0; i < data->world_name_len; i++) {
         switch (i) {
             case 0:
-                printf("WorldName: %c", data->worldName[i]);
+                printf("WorldName: %c", data->world_name[i]);
                 break;
                 
             default:
-                printf("%c", data->worldName[i]);
+                printf("%c", data->world_name[i]);
         }
     }
     printf("\n");
@@ -145,7 +145,7 @@ void log_data() {
     fprintf(logFp, "PosY: %.6f\n", data->posY);
     fprintf(logFp, "Team: %d\n", data->team);
     fprintf(logFp, "Dead: %d\n", data->dead);
-    fprintf(logFp, "RadioChannel: %d\n", data->radioChannel);
+    fprintf(logFp, "RadioChannel: %d\n", data->radio_channel);
     fprintf(logFp, "InWorld: %d\n", data->inWorld);
     fprintf(logFp, "NameLen: %d\n", data->nameLen);
     #endif
@@ -162,16 +162,16 @@ void log_data() {
     }
     fprintf(logFp, "\n");
 
-    fprintf(logFp, "WorldNameLen: %d\n", data->worldNameLen);
+    fprintf(logFp, "WorldNameLen: %d\n", data->world_name_len);
 
-    for (int i = 0; i < data->worldNameLen; i++) {
+    for (int i = 0; i < data->world_name_len; i++) {
         switch (i) {
             case 0:
-                fprintf(logFp, "WorldName: %c", data->worldName[i]);
+                fprintf(logFp, "WorldName: %c", data->world_name[i]);
                 break;
                 
             default:
-                fprintf(logFp, "%c", data->worldName[i]);
+                fprintf(logFp, "%c", data->world_name[i]);
         }
     }
     fprintf(logFp, "\n");
@@ -180,9 +180,9 @@ void log_data() {
 void mmfPeek() {
     system("cls");
     for (int i = 0; i < 64; i++) {
-        printf("mappedFile[%d]: %c\n", i, mappedFile[i]);
+        printf("mmf[%d]: %c\n", i, mmf[i]);
         if (i > 59 && i < 63) {
-            printf("mappedFile[%d]: %d\n", i, mappedFile[i]);
+            printf("mmf[%d]: %d\n", i, mmf[i]);
         }
     }
     
@@ -248,22 +248,22 @@ ProxError_t windows_main() {
     strcpy(filePath, temp);
     strcat(filePath, fileName);
 
-    mappedFile = mmap(filePath, 64);
+    mmf = mmap(filePath, 64);
 
-    if ((ProxError_t)mappedFile == FileError) {
+    if ((ProxError_t)mmf == FileError) {
         return FileError;
     }
 
-    if ((ProxError_t)mappedFile == MemoryMappedFileError) {
+    if ((ProxError_t)mmf == MemoryMappedFileError) {
         return MemoryMappedFileError;
     }
 
     ProxError_t err = NoError;
 
     mmfPeek();
-    while (err == NoError && mappedFile[63] != 1) {
+    while (err == NoError && mmf[63] != 1) {
         //system("cls");
-        //err = readData(mappedFile);
+        //err = readData(mmf);
         //print_data();
     }
     printf("err: %d\n", err);
@@ -285,11 +285,11 @@ ProxError_t windows_init() {
     }
 
     //Map file to memory here
-    mappedFile = mmap(filePath, 64);
-    if ((ProxError_t)mappedFile == FileError) {
+    mmf = mmap(filePath, 64);
+    if ((ProxError_t)mmf == FileError) {
         return FileError;
     }
-    if ((ProxError_t)mappedFile == MemoryMappedFileError) {
+    if ((ProxError_t)mmf == MemoryMappedFileError) {
         return MemoryMappedFileError;
     }
 
@@ -440,9 +440,9 @@ uint8_t mumble_initPositionalData(const char *const *programNames, const uint64_
     }
 
     for (int i = 0; i < 3; i++) {
-        buf[i] = mappedFile[60 + i];
+        buf[i] = mmf[60 + i];
         #ifdef DEBUG
-        fprintf(logFp, "mappedFile[%d]: %d\n", 60 + i, mappedFile[60 + i]);
+        fprintf(logFp, "mmf[%d]: %d\n", 60 + i, mmf[60 + i]);
         #endif
     }
     buf[3] = 0;
@@ -491,7 +491,7 @@ bool mumble_fetchPositionalData(float *avatarPos, float *avatarDir, float *avata
 	// Z      | -
 
     fputs("Reading mmf: mumble_fetchPositionalData()\n", logFp);
-    ProxError_t err = readData(mappedFile);
+    ProxError_t err = readData(mmf);
 
     if (err != NoError) {
         mumbleAPI.log(ownID, "Error " + err);
@@ -516,10 +516,10 @@ bool mumble_fetchPositionalData(float *avatarPos, float *avatarDir, float *avata
     avatarPos[0] = cameraPos[0] = data->posX;
     avatarPos[1] = cameraPos[1] = data->posY;
 
-    strlcpy(newContext, data->worldName, sizeof(char) * 28);
+    strlcpy(newContext, data->world_name, sizeof(char) * 28);
 
-    newContext[data->worldNameLen] = data->dead == 1 ? '-1' : data->team;
-    newContext[data->worldNameLen + 1] = '\0';
+    newContext[data->world_name_len] = data->dead == 1 ? '-1' : data->team;
+    newContext[data->world_name_len + 1] = '\0';
     *context = newContext;
     fprintf(logFp, "context: %s\n", *context);
 
@@ -543,8 +543,8 @@ void mumble_shutdownPositionalData() {
     
     
 
-    // WindowsUnmap(mappedFile);
-    if (munmap(mappedFile) != 0) {
+    // WindowsUnmap(mmf);
+    if (munmap(mmf) != 0) {
         mumbleAPI.log(ownID, "Munmap failure!");
         fputs("Munmap failure!\n", logFp);
     }
@@ -576,7 +576,7 @@ int main() {
 
     free(buf);              // Automatically gets freed by OS on Process Exit
     free(data);             // But best practice is to manually unmap and free
-    munmap((void*)mappedFile);
+    munmap((void*)mmf);
     free(filePath);
     free(logPath);
     */

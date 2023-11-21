@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bundle version="1.0.0">
+  <assets>
+    <plugin os="macos" arch="x86_64">libTerrariaPlugin.dylib</plugin>
+  </assets>
+  <name>TerrariaPlugin</name>
+  <version>1.2.1</version>
+</bundle>

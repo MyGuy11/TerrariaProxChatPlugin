@@ -12,10 +12,10 @@ add_library(TerrariaPlugin
 		_tmodloader.c
 )
 
-add_executable(test
-	_tmodloader.c
-	tmodloader.c
-)
+#add_executable(test
+#	_tmodloader.c
+#	tmodloader.c
+#)
 
 target_include_directories(TerrariaPlugin
 	PUBLIC "${CMAKE_SOURCE_DIR}/include/"
