@@ -9,13 +9,13 @@ typedef unsigned char byte;
 
 // Comments next to fields indicate byte / range
 typedef struct data_container { // 128 bytes
-    float posX; // 0 - 3
-    float posY; // 4 - 7
+    float posx; // 0 - 3
+    float posy; // 4 - 7
     byte team; // 8
     byte dead; // 9
     byte radio_channel; // 10
-    byte inWorld; // 11
-    byte nameLen; // 12
+    byte inworld; // 11
+    byte namelen; // 12
     char* name; // 13 - 34
     byte world_name_len; // 35
     char* world_name; // 36 - 63
